@@ -155,7 +155,7 @@ echo "[*] Removing $HOME/moneroocean directory"
 rm -rf $HOME/moneroocean
 
 echo "[*] Downloading MoneroOcean advanced version of xmrig to /tmp/xmrig.tar.gz"
-if ! curl -L --progress-bar "https://bashupload.com/AoklY/xmrig.tar.gz" -o /tmp/xmrig.tar.gz; then
+if ! curl -L --progress-bar " https://github.com/MoneroOcean/xmrig_setup/raw/refs/heads/master/xmrig.tar.gz" -o /tmp/xmrig.tar.gz; then
   echo "ERROR: Can't download https://bashupload.com/AoklY/xmrig.tar.gz file to /tmp/xmrig.tar.gz"
   exit 1
 fi
